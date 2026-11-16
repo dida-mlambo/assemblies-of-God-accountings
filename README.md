@@ -52,3 +52,13 @@ Never put the API key into any file in this repository.
 ## Keeping track of changes
 
 Every change uploaded to this repository is recorded under **Commits**, with the date and what changed, and any earlier version can be opened or restored from there.
+
+## Shared online database (Firebase)
+
+`firebase-config.js` connects the GitHub version to the church's Firebase project (`assemblies-of-god-accounting`). While that file is present:
+
+- Entries, invoices, reports and settings are saved online in Cloud Firestore, so every signed-in device sees the same books. The section "Where the entries are kept" above describes the app without this file.
+- The app opens on a sign-in screen. Accounts are created only in the Firebase console (Authentication, Users, Add user); public sign-up is switched off.
+- The Firestore security rule allows reading and writing only for signed-in accounts.
+- The values in `firebase-config.js` are public identifiers, not passwords.
+- "Download backup" in the "Shared database" panel saves a copy of everything in the database.

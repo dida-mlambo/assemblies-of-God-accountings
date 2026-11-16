@@ -132,7 +132,89 @@
   };
 
   var caps = { db: db, sample: sample, downloads: downloads, standalone: standalone };
-  window.claude = { use: function (name) { return Promise.resolve(caps[name] || null); } };
+  /* ---------------- shared online database (Firebase) ----------------
+   * Used when firebase-config.js is present. Entries then live in Cloud Firestore
+   * instead of this browser, behind an email + password sign-in. Firestore's own
+   * API has the same shape the app expects, so the store is handed over as-is. */
+  var FB = window.FIREBASE_CONFIG || null, fbAuth = null, fbStore = null, fbUser = null, localDocs = docs;
+  var SDK = "https://www.gstatic.com/firebasejs/10.14.1/";
+  var signUi = null, signState = "wait";
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) { var s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = function () { reject(new Error("could not load " + src)); }; document.head.appendChild(s); });
+  }
+  function showSignIn(state) {           // "wait" | "form" | "off" | any other text = a fatal message
+    signState = state;
+    if (!document.body) return;          // applied again once the page has loaded
+    if (!signUi) buildSignIn();
+    signUi.wrap.hidden = state === "off";
+    signUi.form.hidden = state !== "form";
+    if (state === "wait") signUi.msg.textContent = "Connecting to the church database…";
+    else if (state === "form") { signUi.msg.textContent = ""; signUi.email.focus(); }
+    else if (state !== "off") signUi.msg.textContent = state;
+  }
+  function buildSignIn() {
+    var wrap = el("div"); wrap.style.cssText = "position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:16px;overflow:auto";
+    var card = el("div", "panel"); card.style.cssText = "width:100%;max-width:380px;display:grid;gap:12px";
+    card.appendChild(el("h2", null, "Sign in to the church accounts"));
+    var form = el("form"); form.style.cssText = "display:grid;gap:12px";
+    var l1 = el("label", "field"); l1.appendChild(el("span", null, "Email"));
+    var email = el("input"); email.type = "email"; email.id = "signEmail"; email.required = true; email.autocomplete = "username"; l1.appendChild(email);
+    var l2 = el("label", "field"); l2.appendChild(el("span", null, "Password"));
+    var pass = el("input"); pass.type = "password"; pass.id = "signPass"; pass.required = true; pass.autocomplete = "current-password"; l2.appendChild(pass);
+    var acts = el("div", "actions"), go = el("button", "btn primary", "Sign in"), forgot = el("button", "btn", "Forgot password?");
+    go.type = "submit"; forgot.type = "button"; acts.appendChild(go); acts.appendChild(forgot);
+    form.appendChild(l1); form.appendChild(l2); form.appendChild(acts);
+    var msg = el("p", "hint"); msg.setAttribute("role", "status"); msg.style.margin = "0";
+    card.appendChild(form); card.appendChild(msg); wrap.appendChild(card); document.body.appendChild(wrap);
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault(); go.disabled = true; msg.textContent = "Signing in…";
+      fbAuth.signInWithEmailAndPassword(email.value.trim(), pass.value).then(function () { pass.value = ""; }, function (e) {
+        var c = e && e.code;
+        msg.textContent = c === "auth/too-many-requests" ? "Too many attempts. Wait a few minutes and try again."
+          : c === "auth/network-request-failed" ? "No connection. Check the internet and try again."
+          : c === "auth/user-disabled" ? "This account has been switched off. Ask the treasurer."
+          : "That email or password is not right. Accounts are created by the church treasurer.";
+      }).then(function () { go.disabled = false; });
+    });
+    forgot.onclick = function () {
+      var a = email.value.trim(); if (!a) { msg.textContent = "Type your email address first, then press Forgot password."; email.focus(); return; }
+      fbAuth.sendPasswordResetEmail(a).then(function () { msg.textContent = "If that address has an account, a password reset email has been sent to it."; },
+        function () { msg.textContent = "The reset email could not be sent. Check the address and try again."; });
+    };
+    signUi = { wrap: wrap, form: form, msg: msg, email: email };
+  }
+  function refreshPanel() {
+    if (ui.who && fbUser) ui.who.textContent = "Signed in as " + (fbUser.email || "") + ". Entries are saved online in the church's shared database, so every signed-in device sees the same books.";
+  }
+  var dbReady = !FB ? Promise.resolve(db) : new Promise(function (resolve) {
+    loadScript(SDK + "firebase-app-compat.js")
+      .then(function () { return loadScript(SDK + "firebase-auth-compat.js"); })
+      .then(function () { return loadScript(SDK + "firebase-firestore-compat.js"); })
+      .then(function () {
+        window.firebase.initializeApp(FB); fbAuth = window.firebase.auth(); fbStore = window.firebase.firestore();
+        var first = true;
+        fbAuth.onAuthStateChanged(function (user) {
+          if (user) { fbUser = user; showSignIn("off"); refreshPanel(); if (first) { first = false; resolve(fbStore); } }
+          else if (!first) location.reload();      // signed out: start clean
+          else showSignIn("form");
+        });
+      })
+      .catch(function () { showSignIn("The online database could not be loaded. Check the internet connection and reload the page."); });
+  });
+  function fbBackup() {
+    if (!fbStore || !fbUser) return;
+    say("Preparing the backup…");
+    var out = {};
+    var grab = function (q) { return q.get().then(function (s) { s.forEach(function (d) { out[d.ref.path] = d.data(); }); }); };
+    Promise.all([grab(fbStore.collection("settings")), grab(fbStore.collection("invoices")), grab(fbStore.collection("reports")), grab(fbStore.collectionGroup("tx"))]).then(function () {
+      var n = Object.keys(out).length; if (!n) { say("There is nothing to back up yet."); return; }
+      var d = new Date(), stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      saveBlob("church-accounts-backup-" + stamp + ".json", JSON.stringify({ app: "ag-church-accounts", version: 1, exportedAt: d.toISOString(), docs: out }, null, 1));
+      say("Backup downloaded (" + n + " records). Keep the file somewhere safe.");
+    }, function () { say("The backup could not be prepared. Try again."); });
+  }
+
+  window.claude = { use: function (name) { return name === "db" ? dbReady : Promise.resolve(caps[name] || null); } };
 
   /* ---------------- "This device" panel ---------------- */
   var ui = {};
@@ -148,13 +230,27 @@
   function buildPanel() {
     var foot = el("footer", "wrap"); foot.style.paddingBottom = "48px";
     var panel = ui.panel = el("div", "panel"); foot.appendChild(panel);
-    panel.appendChild(el("h2", null, "This device"));
-    var p = el("p", "hint", "Entries are saved in this browser on this device only. They are not on GitHub and are not shared with other phones or computers. Clearing the browser's data deletes them, so download a backup regularly.");
+    panel.appendChild(el("h2", null, FB ? "Shared database" : "This device"));
+    var p = el("p", "hint", FB ? "Entries are saved online in the church's shared database, so every signed-in device sees the same books."
+      : "Entries are saved in this browser on this device only. They are not on GitHub and are not shared with other phones or computers. Clearing the browser's data deletes them, so download a backup regularly.");
+    if (FB) ui.who = p;
     p.style.margin = "0 0 12px"; panel.appendChild(p);
 
     var row = el("div", "actions");
     var bBackup = el("button", "btn", "Download backup"), bRestore = el("button", "btn", "Restore from backup"), bKey = el("button", "btn", "AI report key");
-    [bBackup, bRestore, bKey].forEach(function (b) { b.type = "button"; row.appendChild(b); });
+    var bOut = el("button", "btn", "Sign out"), nLocal = Object.keys(localDocs).length, moveLabel = "Copy this device's old entries online", bMove = el("button", "btn", moveLabel);
+    var btns = FB ? [bBackup, bKey, bOut] : [bBackup, bRestore, bKey];
+    if (FB && nLocal) btns.splice(1, 0, bMove);
+    btns.forEach(function (b) { b.type = "button"; row.appendChild(b); });
+    bOut.onclick = function () { if (fbAuth) fbAuth.signOut(); };
+    bMove.onclick = function () {
+      if (!fbStore || !fbUser) return;
+      if (!bMove.dataset.armed) { bMove.dataset.armed = "1"; bMove.textContent = "Confirm: copy " + nLocal + " records online"; setTimeout(function () { delete bMove.dataset.armed; bMove.textContent = moveLabel; }, 5000); return; }
+      bMove.disabled = true; say("Copying…");
+      Promise.all(Object.keys(localDocs).map(function (path) { return fbStore.doc(path).set(localDocs[path]); })).then(function () {
+        say("Copied " + nLocal + " records from this device into the shared database."); bMove.hidden = true;
+      }, function () { say("Some records could not be copied. Check the connection and try again."); bMove.disabled = false; });
+    };
     panel.appendChild(row);
     var file = el("input"); file.type = "file"; file.accept = ".json,application/json"; file.hidden = true; file.id = "restoreFile"; panel.appendChild(file);
     ui.msg = el("p", "hint"); ui.msg.setAttribute("role", "status"); ui.msg.style.marginTop = "10px"; panel.appendChild(ui.msg);
@@ -167,6 +263,7 @@
     var pending = null;
 
     bBackup.onclick = function () {
+      if (FB) { fbBackup(); return; }
       var n = Object.keys(docs).length;
       if (!n) { say("There is nothing to back up yet."); return; }
       var d = new Date(), stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -220,5 +317,6 @@
 
     document.body.appendChild(foot);
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", buildPanel); else buildPanel();
+  function start() { buildPanel(); if (FB) { showSignIn(signState); refreshPanel(); } }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
