@@ -123,10 +123,18 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
 .chip button:hover { color: var(--expense) }
 .addrow { display: flex; gap: 8px; max-width: 420px }
 .addrow input { flex: 1; min-width: 0 }
+.inv { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 20px; align-items: start }
+.item, .itemhead { display: grid; grid-template-columns: minmax(0, 1fr) 62px 92px 34px; gap: 6px; align-items: center }
+.itemhead { font-size: 12px; font-weight: 600; color: var(--muted) }
+.item input { width: 100%; font-size: 14px; padding: 7px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--fg) }
+.item .btn { padding: 5px 0 }
+#invItems { display: grid; gap: 6px }
+.invtotal { display: flex; justify-content: space-between; font: 700 17px var(--display); padding-top: 10px; border-top: 1px solid var(--line) }
+.rowbtns.wrapb { flex-wrap: wrap; max-width: 260px; margin-left: auto }
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--band); color: #fff; padding: 10px 16px; border-radius: var(--r); font-size: 14px; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); z-index: 20; border: 1px solid #3a3d47 }
 #toast button { background: transparent; border: 0; color: var(--gold); font-weight: 700; cursor: pointer; font-size: 14px }
 @media (max-width: 860px) {
-  .entry, .two { grid-template-columns: minmax(0, 1fr) }
+  .entry, .two, .inv { grid-template-columns: minmax(0, 1fr) }
   .tiles { grid-template-columns: minmax(0, 1fr) }
   .bankrow { grid-template-columns: repeat(2, minmax(0, 1fr)) }
   .tile .val { font-size: 24px }
@@ -156,6 +164,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
       <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
       <button role="tab" data-tab="entries" aria-selected="false">Entries</button>
       <button role="tab" data-tab="report" aria-selected="false">Monthly report</button>
+      <button role="tab" data-tab="invoices" aria-selected="false">Invoices</button>
       <button role="tab" data-tab="year" aria-selected="false">Year</button>
       <button role="tab" data-tab="settings" aria-selected="false">Income &amp; expense types</button>
     </div>
@@ -253,6 +262,44 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     </div>
   </section>
 
+  <!-- INVOICES -->
+  <section id="tab-invoices" class="inv" hidden>
+    <form class="panel" id="invForm" autocomplete="off">
+      <h2 id="invFormTitle">New invoice</h2>
+      <div class="row2">
+        <label class="field"><span>Invoice no.</span><input type="text" id="invNo" maxlength="30" required></label>
+        <label class="field"><span>Invoice date</span><input type="date" id="invDate" required></label>
+      </div>
+      <label class="field"><span>Bill to (name)</span><input type="text" id="invTo" maxlength="100" required placeholder="Person or organisation"></label>
+      <label class="field"><span>Their address or contact (optional)</span><textarea id="invToInfo" rows="2" maxlength="300"></textarea></label>
+      <div>
+        <div class="itemhead"><span>Item</span><span>Qty</span><span>Unit price</span><span></span></div>
+        <div id="invItems" style="margin-top:6px"></div>
+        <button class="btn small" type="button" id="invAddLine" style="margin-top:8px">Add another line</button>
+      </div>
+      <div class="invtotal"><span>Total</span><span class="num" id="invTotal">0.00</span></div>
+      <div class="row2">
+        <label class="field"><span>Payment due (optional)</span><input type="date" id="invDue"></label>
+        <label class="field"><span>Income type when paid</span><select id="invCat"></select></label>
+      </div>
+      <label class="field"><span>Notes on the invoice (optional)</span><textarea id="invNotes" rows="2" maxlength="500"></textarea></label>
+      <div class="actions">
+        <button class="btn primary" type="submit" id="invSave">Save invoice</button>
+        <button class="btn" type="button" id="invCancel" hidden>Cancel</button>
+      </div>
+      <p class="hint" id="invMsg" role="status"></p>
+    </form>
+    <div class="panel" style="min-width:0">
+      <h2>Invoices</h2>
+      <p class="hint" id="invHint" style="margin-bottom:10px"></p>
+      <div class="scroll"><table>
+        <thead><tr><th>No.</th><th>Date</th><th>Bill to</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead>
+        <tbody id="invBody"></tbody>
+      </table></div>
+      <div class="empty" id="invEmpty">Loading invoices…</div>
+    </div>
+  </section>
+
   <!-- YEAR -->
   <section id="tab-year" hidden>
     <div class="panel">
@@ -284,12 +331,17 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
         <label class="field"><span>Church / assembly name</span><input type="text" id="setName" maxlength="80"></label>
         <label class="field"><span>Currency symbol</span><input type="text" id="setCur" maxlength="6"></label>
       </div>
+      <div style="display:grid;gap:12px;max-width:520px;margin-top:12px">
+        <label class="field"><span>Church address and contact (printed on invoices)</span><textarea id="setAddr" rows="2" maxlength="300"></textarea></label>
+        <label class="field"><span>How to pay, e.g. bank account details (printed on invoices)</span><textarea id="setPay" rows="3" maxlength="500"></textarea></label>
+      </div>
       <div class="actions" style="margin-top:12px"><button class="btn primary" id="saveDetails" type="button">Save details</button></div>
     </div>
   </section>
 </main>
 <div id="toast" hidden><span id="toastMsg"></span><button id="toastAct" hidden></button></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -300,7 +352,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   const NEW = "__new__";
 
   const DEFAULTS = {
-    churchName: "Assemblies of God", currency: "$",
+    churchName: "Assemblies of God", currency: "$", address: "", payInfo: "",
     income: ["Tithes", "Offerings", "Thanksgiving", "Building Fund", "Missions", "Sunday School", "Special Seed", "Donations", "Other Income"],
     expense: ["Pastoral Support", "Rent", "Utilities", "Missions & Outreach", "Maintenance", "Equipment", "Welfare", "Transport", "District / HQ Remittance", "Administration", "Other Expense"],
   };
@@ -497,6 +549,8 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     renderChips($("#chipsInc"), "income"); renderChips($("#chipsExp"), "expense");
     if (document.activeElement !== $("#setName")) $("#setName").value = S.settings.churchName;
     if (document.activeElement !== $("#setCur")) $("#setCur").value = S.settings.currency;
+    if (document.activeElement !== $("#setAddr")) $("#setAddr").value = S.settings.address || "";
+    if (document.activeElement !== $("#setPay")) $("#setPay").value = S.settings.payInfo || "";
   }
 
   function fillCats(keep) {
@@ -544,7 +598,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   }
 
   function render() {
-    renderHeader(); renderBank(); renderOverview(); renderList(); renderReport(); renderSettings();
+    renderHeader(); renderBank(); renderOverview(); renderList(); renderReport(); renderSettings(); renderInvoices();
     $("#quickAdd").hidden = !S.canWrite; $("#txForm").hidden = !S.canWrite;
     for (const id of ["addInc", "addIncBtn", "addExp", "addExpBtn", "saveDetails"]) $("#" + id).disabled = !S.canWrite;
   }
@@ -553,7 +607,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   function setTab(tab) {
     S.tab = tab;
     document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
-    for (const t of ["overview", "entries", "report", "year", "settings"]) $("#tab-" + t).hidden = t !== tab;
+    for (const t of ["overview", "entries", "report", "invoices", "year", "settings"]) $("#tab-" + t).hidden = t !== tab;
     if (tab === "year") loadYear();
     try { localStorage.setItem("ag-tab", tab); } catch (e) {}
   }
@@ -588,7 +642,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     if (!db) return;
     const next = Object.assign({}, S.settings, patch);
     S.settings = next; fillCats(); render();
-    try { await db.doc("settings/main").set({ churchName: next.churchName, currency: next.currency, income: next.income, expense: next.expense }); if (msg) toast(msg); }
+    try { await db.doc("settings/main").set({ churchName: next.churchName, currency: next.currency, address: next.address || "", payInfo: next.payInfo || "", income: next.income, expense: next.expense }); if (msg) toast(msg); }
     catch (e) { toast("Could not save that change. Try again."); }
   }
   function addCategory(kind, input) {
@@ -706,6 +760,165 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     try { await downloads.save({ filename, data }); } catch (e) { if (e && e.code !== "declined") toast("The file could not be saved here."); }
   }
 
+  /* ---------- invoices ---------- */
+  let invoices = [], invLoaded = false, invEditing = null, standalone = null, logoData = null;
+  (function loadLogo() {
+    const img = new Image();
+    img.onload = () => { try { const c = document.createElement("canvas"); c.width = 344; c.height = 272; c.getContext("2d").drawImage(img, 0, 0, 344, 272); logoData = c.toDataURL("image/png"); } catch (e) {} };
+    img.src = "logo.png";
+  })();
+  const lineAmount = (it) => Math.round(Number(it.q || 0) * cents(it.p));
+  const invTotal = (inv) => (inv.items || []).reduce((s, it) => s + lineAmount(it), 0);
+  function nextInvNo() { let max = 0; for (const i of invoices) { const m = String(i.number || "").match(/(\d+)\s*$/); if (m) max = Math.max(max, +m[1]); } return "INV-" + String(max + 1).padStart(4, "0"); }
+  function armed(label, confirmLabel, fn) {
+    const b = el("button", "btn small", label); b.type = "button";
+    b.onclick = () => { if (b.dataset.armed) fn(); else { b.dataset.armed = "1"; b.textContent = confirmLabel; b.classList.add("danger"); setTimeout(() => { delete b.dataset.armed; b.textContent = label; b.classList.remove("danger"); }, 4000); } };
+    return b;
+  }
+  function addItemRow(it) {
+    const row = el("div", "item"), d = el("input"), q = el("input"), p = el("input"), x = el("button", "btn small", "×");
+    d.type = "text"; d.placeholder = "Description"; d.maxLength = 120; d.value = it ? it.d : ""; d.setAttribute("aria-label", "Item description");
+    q.type = "number"; q.min = "0"; q.step = "any"; q.value = it ? it.q : 1; q.setAttribute("aria-label", "Quantity");
+    p.type = "number"; p.min = "0"; p.step = "0.01"; p.placeholder = "0.00"; p.value = it ? plain(cents(it.p)) : ""; p.setAttribute("aria-label", "Unit price");
+    x.type = "button"; x.setAttribute("aria-label", "Remove this line");
+    x.onclick = () => { row.remove(); if (!$("#invItems").children.length) addItemRow(); formTotal(); };
+    [d, q, p].forEach((i) => { i.oninput = formTotal; });
+    row.append(d, q, p, x); $("#invItems").append(row);
+  }
+  function readItems() {
+    return [...$("#invItems").children].map((r) => { const i = r.querySelectorAll("input"); return { d: i[0].value.trim(), q: Number(i[1].value || 0), p: cents(i[2].value) / 100 }; }).filter((it) => it.d || it.p);
+  }
+  function formTotal() { $("#invTotal").textContent = money(invTotal({ items: readItems() })); }
+  function resetInvForm() {
+    invEditing = null; $("#invForm").reset(); $("#invItems").textContent = ""; addItemRow();
+    $("#invNo").value = nextInvNo(); $("#invDate").value = todayStr();
+    fillInvCats(S.settings.income.includes("Other Income") ? "Other Income" : S.settings.income[0] || "");
+    $("#invFormTitle").textContent = "New invoice"; $("#invSave").textContent = "Save invoice"; $("#invCancel").hidden = true; $("#invMsg").textContent = ""; formTotal();
+  }
+  function startEditInv(inv) {
+    invEditing = inv;
+    $("#invNo").value = inv.number || ""; $("#invDate").value = inv.date || todayStr(); $("#invDue").value = inv.due || ""; $("#invTo").value = inv.to || ""; $("#invToInfo").value = inv.toInfo || ""; $("#invNotes").value = inv.notes || "";
+    $("#invItems").textContent = ""; (inv.items && inv.items.length ? inv.items : [null]).forEach((it) => addItemRow(it));
+    fillInvCats(inv.category);
+    $("#invFormTitle").textContent = "Edit invoice " + (inv.number || ""); $("#invSave").textContent = "Save changes"; $("#invCancel").hidden = false; $("#invMsg").textContent = ""; formTotal();
+    $("#invForm").scrollIntoView({ block: "nearest" });
+  }
+  function fillInvCats(keep) {
+    const sel = $("#invCat"), want = keep != null ? keep : sel.value; sel.textContent = "";
+    const names = S.settings.income.slice(); if (want && !names.includes(want)) names.push(want);
+    for (const n of names) { const o = el("option", null, n); o.value = n; sel.append(o); }
+    if (want) sel.value = want;
+  }
+  async function submitInv(ev) {
+    ev.preventDefault();
+    const msg = $("#invMsg"), items = readItems(), number = $("#invNo").value.trim(), to = $("#invTo").value.trim(), date = $("#invDate").value;
+    if (!db) { msg.textContent = "The ledger can't be reached in this view, so nothing was saved."; return; }
+    if (!number || !to || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { msg.textContent = "Fill in the invoice number, date and who it is billed to."; return; }
+    if (!items.length || invTotal({ items }) <= 0) { msg.textContent = "Add at least one item with a price."; return; }
+    if (invoices.some((i) => i.number === number && (!invEditing || i.id !== invEditing.id))) { msg.textContent = "Invoice number " + number + " is already used. Choose another."; return; }
+    const now = new Date().toISOString(), e = invEditing;
+    const doc = { number, date, due: $("#invDue").value || "", to, toInfo: $("#invToInfo").value.trim(), items, notes: $("#invNotes").value.trim(), category: $("#invCat").value || "",
+      status: (e && e.status) || "unpaid", paidDate: (e && e.paidDate) || "", total: invTotal({ items }) / 100, createdAt: (e && e.createdAt) || now, updatedAt: now };
+    $("#invSave").disabled = true; msg.textContent = "Saving…";
+    try {
+      if (e) await db.doc("invoices/" + e.id).set(doc); else await db.collection("invoices").add(doc);
+      toast("Invoice " + number + (e ? " updated." : " saved. Use the PDF button to download it.")); resetInvForm();
+    } catch (err) { msg.textContent = err && err.code === "invalid_argument" ? "You have view-only access, so the invoice was not saved." : "Could not save the invoice. Try again."; }
+    $("#invSave").disabled = false;
+  }
+  async function markPaid(inv) {
+    const date = todayStr(), now = new Date().toISOString(), cat = inv.category || S.settings.income[0] || "Other Income";
+    const rest = Object.assign({}, inv); delete rest.id;
+    try {
+      await txCol(date.slice(0, 7)).add({ type: "income", date, category: cat, amount: invTotal(inv) / 100, description: "Invoice " + (inv.number || ""), party: inv.to || "", method: "Other", ref: inv.number || "", createdAt: now, updatedAt: now });
+      await db.doc("invoices/" + inv.id).set(Object.assign(rest, { status: "paid", paidDate: date, updatedAt: now }));
+      yearCache = {}; monthCache = {}; computeBank();
+      toast("Invoice " + inv.number + " marked paid and recorded as income under " + cat + ".");
+    } catch (e) { toast("Could not mark the invoice as paid. Try again."); }
+  }
+  function buildPdf(inv) {
+    if (!window.jspdf) return null;
+    const doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4", compress: true }), L = 18, R = 192, right = { align: "right" };
+    const paid = inv.status === "paid", total = invTotal(inv);
+    const font = (style, size, r, g, b) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(r, g, b); };
+    if (logoData) { try { doc.addImage(logoData, "PNG", L, 11, 30, 23.7); } catch (e) {} }
+    const hx = logoData ? L + 35 : L;
+    font("bold", 15, 16, 17, 20); doc.text(S.settings.churchName || "", hx, 20);
+    const addr = S.settings.address ? doc.splitTextToSize(S.settings.address, 78) : [];
+    font("normal", 9, 93, 98, 112); if (addr.length) doc.text(addr, hx, 25.5);
+    font("bold", 22, 16, 17, 20); doc.text("INVOICE", R, 21, right);
+    font("normal", 10, 21, 22, 26); doc.text("No. " + (inv.number || ""), R, 28, right); doc.text("Date: " + dayLabel(inv.date), R, 33, right); if (inv.due) doc.text("Due: " + dayLabel(inv.due), R, 38, right);
+    let y = Math.max(42, 25.5 + addr.length * 4 + 4);
+    doc.setDrawColor(255, 214, 10); doc.setLineWidth(1.2); doc.line(L, y, R, y); y += 9;
+    font("bold", 8, 93, 98, 112); doc.text("BILL TO", L, y); y += 5.5;
+    font("bold", 11, 16, 17, 20); doc.text(inv.to || "", L, y); y += 5;
+    if (inv.toInfo) { const info = doc.splitTextToSize(inv.toInfo, 90); font("normal", 9.5, 93, 98, 112); doc.text(info, L, y); y += info.length * 4.4; }
+    y += 6;
+    const head = () => { doc.setFillColor(16, 17, 20); doc.rect(L, y, R - L, 8, "F"); font("bold", 9, 255, 255, 255); doc.text("Description", L + 3, y + 5.4); doc.text("Qty", 128, y + 5.4, right); doc.text("Unit price", 160, y + 5.4, right); doc.text("Amount", R - 3, y + 5.4, right); y += 8; };
+    head();
+    for (const it of inv.items || []) {
+      const lines = doc.splitTextToSize(it.d || "-", 92), h = lines.length * 4.6 + 4;
+      if (y + h > 270) { doc.addPage(); y = 18; head(); }
+      font("normal", 10, 21, 22, 26);
+      doc.text(lines, L + 3, y + 5.2); doc.text(String(it.q), 128, y + 5.2, right); doc.text(money(cents(it.p)), 160, y + 5.2, right); doc.text(money(lineAmount(it)), R - 3, y + 5.2, right);
+      y += h; doc.setDrawColor(220, 223, 230); doc.setLineWidth(0.2); doc.line(L, y, R, y);
+    }
+    if (y > 235) { doc.addPage(); y = 18; }
+    y += 9; font("bold", 12, 16, 17, 20); doc.text(paid ? "Total paid" : "Total due", 160, y, right); doc.text(money(total), R - 3, y, right);
+    if (paid) { y += 7; font("bold", 11, 11, 122, 83); doc.text("PAID" + (inv.paidDate ? " on " + dayLabel(inv.paidDate) : ""), R - 3, y, right); }
+    y += 13;
+    const block = (title, text) => {
+      if (!text) return; const ls = doc.splitTextToSize(text, R - L);
+      if (y + ls.length * 4.6 + 8 > 285) { doc.addPage(); y = 18; }
+      font("bold", 8, 93, 98, 112); doc.text(title, L, y); y += 5; font("normal", 10, 21, 22, 26); doc.text(ls, L, y); y += ls.length * 4.6 + 6;
+    };
+    if (!paid) block("HOW TO PAY", S.settings.payInfo); block("NOTES", inv.notes);
+    return doc;
+  }
+  async function invAction(kind, inv) {
+    const doc = buildPdf(inv);
+    if (!doc) { toast("The PDF tool did not load. Check the internet connection and reload the page."); return; }
+    const blob = doc.output("blob"), name = String(inv.number || "invoice").replace(/[^\w.-]+/g, "-") + ".pdf";
+    try {
+      if (kind === "pdf") await downloads.save({ filename: name, data: blob });
+      else if (kind === "print") { standalone.openPdf(blob); toast("The invoice opened in a new tab. Use the print button there."); }
+      else await standalone.share(blob, name, "Invoice " + (inv.number || ""));
+    } catch (e) {
+      if (e && (e.code === "declined" || e.name === "AbortError")) return;
+      toast(kind === "print" ? "The browser blocked the new tab. Allow pop-ups for this site, or download the PDF and print it." : kind === "share" ? "Sharing is not available in this browser. Download the PDF and send that." : "The PDF could not be saved here.");
+    }
+  }
+  function renderInvoices() {
+    fillInvCats(); $("#invForm").hidden = !S.canWrite;
+    const body = $("#invBody"); body.textContent = "";
+    const canShare = !!(standalone && standalone.canShare());
+    const list = invoices.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || String(b.number).localeCompare(String(a.number)));
+    for (const inv of list) {
+      const tr = el("tr"), paid = inv.status === "paid";
+      tr.append(el("td", "nw", inv.number || ""), el("td", "nw num", inv.date ? dayLabel(inv.date) : ""), el("td", null, inv.to || ""), el("td", "r num", money(invTotal(inv))));
+      const st = el("td"); st.append(el("span", "pill " + (paid ? "inc" : "exp"), paid ? "Paid" : "Unpaid")); tr.append(st);
+      const td = el("td"), bx = el("div", "rowbtns wrapb");
+      const btn = (label, fn) => { const b = el("button", "btn small", label); b.type = "button"; b.onclick = fn; bx.append(b); };
+      if (downloads) btn("PDF", () => invAction("pdf", inv));
+      if (standalone) btn("Print", () => invAction("print", inv));
+      if (canShare) btn("Share", () => invAction("share", inv));
+      if (S.canWrite) {
+        if (!paid) bx.append(armed("Mark paid", "Confirm paid", () => markPaid(inv)));
+        btn("Edit", () => startEditInv(inv));
+        bx.append(armed("Delete", "Confirm delete", async () => { try { await db.doc("invoices/" + inv.id).delete(); if (invEditing && invEditing.id === inv.id) resetInvForm(); toast("Invoice deleted."); } catch (e) { toast("Could not delete the invoice."); } }));
+      }
+      td.append(bx); tr.append(td); body.append(tr);
+    }
+    $("#invEmpty").hidden = list.length > 0;
+    $("#invEmpty").textContent = invLoaded || !db ? "No invoices yet. Fill in the form to create the first one." : "Loading invoices…";
+    $("#invHint").textContent = standalone ? "PDF downloads the invoice. Print opens it in a new tab to print. Share sends the PDF through your device's share menu where the browser supports it. Mark paid also records the amount as income."
+      : "PDF downloads the invoice. To print or share it, open the downloaded file and print or send it from there. Mark paid also records the amount as income.";
+  }
+  $("#invForm").addEventListener("submit", submitInv);
+  $("#invAddLine").onclick = () => addItemRow();
+  $("#invCancel").onclick = () => resetInvForm();
+  resetInvForm();
+
   /* ---------- wiring ---------- */
   $("#monthPick").addEventListener("change", (e) => setMonth(e.target.value));
   $("#prevMonth").onclick = () => setMonth(shiftMonth(S.month, -1));
@@ -722,7 +935,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   $("#addIncBtn").onclick = () => addCategory("income", $("#addInc")); $("#addExpBtn").onclick = () => addCategory("expense", $("#addExp"));
   $("#addInc").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory("income", $("#addInc")); } };
   $("#addExp").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory("expense", $("#addExp")); } };
-  $("#saveDetails").onclick = () => saveSettings({ churchName: $("#setName").value.trim() || DEFAULTS.churchName, currency: $("#setCur").value.trim() || DEFAULTS.currency }, "Details saved.");
+  $("#saveDetails").onclick = () => saveSettings({ churchName: $("#setName").value.trim() || DEFAULTS.churchName, currency: $("#setCur").value.trim() || DEFAULTS.currency, address: $("#setAddr").value.trim(), payInfo: $("#setPay").value.trim() }, "Details saved.");
   $("#bankEdit").onclick = () => {
     const b = S.bank;
     $("#bAmount").value = b ? plain(cents(b.amount)) : ""; $("#bDate").value = todayStr(); $("#bScope").value = (b && b.scope) || "all";
@@ -752,22 +965,24 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
 
   /* ---------- start ---------- */
   let savedTab = null; try { savedTab = localStorage.getItem("ag-tab"); } catch (e) {}
-  resetForm(); render(); if (["overview", "entries", "report", "year", "settings"].includes(savedTab)) setTab(savedTab);
+  resetForm(); render(); if (["overview", "entries", "report", "invoices", "year", "settings"].includes(savedTab)) setTab(savedTab);
 
   const use = (n) => (window.claude && typeof window.claude.use === "function") ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
   use("db").then((d) => {
     db = d;
     if (!db) { S.loaded = true; banner("The ledger can't be opened in this view. Open this page in claude.ai while signed in to record and see entries."); render(); return; }
     db.doc("settings/main").onSnapshot((snap) => {
-      if (snap.exists) { const s = snap.data(); S.settings = { churchName: s.churchName || DEFAULTS.churchName, currency: s.currency || DEFAULTS.currency, income: Array.isArray(s.income) ? s.income.slice() : DEFAULTS.income.slice(), expense: Array.isArray(s.expense) ? s.expense.slice() : DEFAULTS.expense.slice() }; }
+      if (snap.exists) { const s = snap.data(); S.settings = { churchName: s.churchName || DEFAULTS.churchName, currency: s.currency || DEFAULTS.currency, address: s.address || "", payInfo: s.payInfo || "", income: Array.isArray(s.income) ? s.income.slice() : DEFAULTS.income.slice(), expense: Array.isArray(s.expense) ? s.expense.slice() : DEFAULTS.expense.slice() }; }
       fillCats(); render(); if (S.tab === "year") renderYear();
     }, () => {});
     db.doc("settings/bank").onSnapshot((snap) => { S.bank = snap.exists ? snap.data() : null; S.bankCalc = null; renderBank(); computeBank(); }, () => {});
+    db.collection("invoices").limit(1000).onSnapshot((snap) => { invoices = docsToTx(snap); invLoaded = true; if (!invEditing && !$("#invTo").value) $("#invNo").value = nextInvNo(); renderInvoices(); }, () => { invLoaded = true; renderInvoices(); });
     subscribeMonth();
     if (S.tab === "year") loadYear();
   });
   use("sample").then((s) => { sample = s; renderReport(); });
-  use("downloads").then((d) => { downloads = d; renderList(); renderReport(); });
+  use("downloads").then((d) => { downloads = d; renderList(); renderReport(); renderInvoices(); });
+  use("standalone").then((s) => { standalone = s; renderInvoices(); });
   use("user").then(async (u) => { if (!u) return; const can = await u.can("data.write"); if (can === false) { S.canWrite = false; render(); } });
 })();
 </script>

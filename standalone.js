@@ -115,7 +115,23 @@
   }
   var downloads = { save: function (req) { try { saveBlob(req.filename, req.data); return Promise.resolve({ status: "saved" }); } catch (e) { return Promise.reject({ code: "unavailable", message: String(e) }); } } };
 
-  var caps = { db: db, sample: sample, downloads: downloads };
+  /* ---------- extras only a normal web page can do: open a PDF to print, share a file ---------- */
+  var standalone = {
+    openPdf: function (blob) {
+      var url = URL.createObjectURL(blob), w = window.open(url, "_blank");
+      setTimeout(function () { URL.revokeObjectURL(url); }, 120000);
+      if (!w) throw { code: "blocked", message: "pop-up blocked" };
+    },
+    canShare: function () {
+      try { return !!(navigator.canShare && navigator.canShare({ files: [new File([new Blob(["x"], { type: "application/pdf" })], "x.pdf", { type: "application/pdf" })] })); }
+      catch (e) { return false; }
+    },
+    share: function (blob, filename, title) {
+      return navigator.share({ files: [new File([blob], filename, { type: "application/pdf" })], title: title });
+    }
+  };
+
+  var caps = { db: db, sample: sample, downloads: downloads, standalone: standalone };
   window.claude = { use: function (name) { return Promise.resolve(caps[name] || null); } };
 
   /* ---------------- "This device" panel ---------------- */
