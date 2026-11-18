@@ -90,6 +90,14 @@ main.wrap { padding-block: 4px 48px; display: grid; gap: 20px }
 .bankrow p { grid-column: 1 / -1; margin: 0 }
 .bval { font: 700 19px/1.3 var(--display); margin-top: 2px; overflow-wrap: anywhere }
 .bval.big { font-size: 26px; font-weight: 800 }
+.banktotal { text-align: right }
+.acctgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px }
+.acct { display: grid; gap: 4px; align-content: start; text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--fg); cursor: pointer; font: inherit; min-width: 0 }
+.acct:hover { border-color: var(--muted) }
+.acct[aria-pressed="true"] { background: var(--note); border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold) }
+.acct .bval { font-size: 18px }
+.acctdetail { margin-top: 16px }
+.acctdetail h3 { font-size: 16px }
 #bankForm { display: grid; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); max-width: 560px }
 .lab { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
 .tile .val { font: 800 28px/1.2 var(--display); margin-top: 4px; overflow-wrap: anywhere }
@@ -154,7 +162,8 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
 @media (max-width: 860px) {
   .entry, .two, .inv { grid-template-columns: minmax(0, 1fr) }
   .tiles { grid-template-columns: minmax(0, 1fr) }
-  .bankrow { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .bankrow, .acctgrid { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .banktotal { text-align: left }
   .tile .val { font-size: 24px }
 }
 </style>
@@ -195,16 +204,17 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   <!-- OVERVIEW -->
   <section id="tab-overview" style="display:grid;gap:20px">
     <div class="panel" id="bankPanel">
-      <div class="bankhead"><h2>Bank balance</h2><button class="btn small" id="bankEdit" type="button">Enter bank balance</button></div>
-      <div class="bankrow" id="bankView"></div>
+      <div class="bankhead"><h2>Bank accounts</h2><div class="banktotal"><div class="lab">Total in all bank accounts</div><div class="bval big num" id="bankTotal">–</div></div></div>
+      <div class="acctgrid" id="acctGrid"></div>
+      <div class="acctdetail" id="acctDetail"></div>
       <form id="bankForm" autocomplete="off" hidden>
+        <h3 id="bankFormTitle">Enter balance</h3>
         <div class="row2">
-          <label class="field"><span>Balance in the bank account</span><input type="number" id="bAmount" step="0.01" inputmode="decimal" required placeholder="0.00"></label>
+          <label class="field"><span>Balance in the account</span><input type="number" id="bAmount" step="0.01" inputmode="decimal" required placeholder="0.00"></label>
           <label class="field"><span>As at (date)</span><input type="date" id="bDate" required></label>
         </div>
-        <label class="field"><span>Which entries change this balance</span><select id="bScope"><option value="all">All income and expenses</option><option value="bank">Only entries marked "Paid by: Bank"</option></select></label>
-        <p class="hint">Type the figure from your bank statement or banking app. Entries dated on or after this date are then added (income) or deducted (expenses). Entries dated before it are taken as already included.</p>
-        <div class="actions"><button class="btn primary" type="submit" id="bankSave">Save bank balance</button><button class="btn" type="button" id="bankCancel">Cancel</button></div>
+        <p class="hint">Type the figure from this account's bank statement or banking app. Entries for this account dated on or after this date are then added (income) or deducted (expenses). Entries dated before it are taken as already included.</p>
+        <div class="actions"><button class="btn primary" type="submit" id="bankSave">Save balance</button><button class="btn" type="button" id="bankCancel">Cancel</button></div>
       </form>
     </div>
     <div class="tiles">
@@ -230,6 +240,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
       <p class="hint" id="dateHint">Pick any past date to backdate. The entry is filed under the month of its date.</p>
       <label class="field"><span id="catLabel">Income type</span><select id="fCat" required></select></label>
       <label class="field" id="newCatField" hidden><span>Name of the new type</span><input type="text" id="fNewCat" maxlength="60" placeholder="e.g. Youth Conference Offering"></label>
+      <label class="field"><span id="acctLabel">Paid into bank account</span><select id="fAcct"></select></label>
       <label class="field"><span>Amount</span><input type="number" id="fAmount" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00"></label>
       <label class="field"><span>Description</span><input type="text" id="fDesc" maxlength="200" placeholder="e.g. Sunday first service"></label>
       <div class="row2">
@@ -248,6 +259,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
       <h2 id="listTitle">Entries</h2>
       <div class="filters">
         <select id="fltType" aria-label="Show"><option value="all">Income and expenses</option><option value="income">Income only</option><option value="expense">Expenses only</option></select>
+        <select id="fltAcct" aria-label="Bank account"></select>
         <input type="search" id="fltQ" placeholder="Search description, type, name" aria-label="Search entries">
         <button class="btn" id="csvBtn" type="button" hidden>Download CSV</button>
       </div>
@@ -300,6 +312,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
         <label class="field"><span>Payment due (optional)</span><input type="date" id="invDue"></label>
         <label class="field"><span>Income type when paid</span><select id="invCat"></select></label>
       </div>
+      <label class="field"><span>Bank account it will be paid into</span><select id="invAcct"></select></label>
       <label class="field"><span>Notes on the invoice (optional)</span><textarea id="invNotes" rows="2" maxlength="500"></textarea></label>
       <div class="actions">
         <button class="btn primary" type="submit" id="invSave">Save invoice</button>
@@ -368,6 +381,24 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   const pad = (n) => String(n).padStart(2, "0");
   const todayStr = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
   const NEW = "__new__";
+  const ACCOUNTS = [
+    { id: "projects", name: "Projects" },
+    { id: "bible-school", name: "Bible School" },
+    { id: "general-fund", name: "National General Fund" },
+    { id: "festival-of-hope", name: "Festival of Hope" },
+  ];
+  const acctName = (id) => { const a = ACCOUNTS.find((x) => x.id === id); return a ? a.name : id === "cash" ? "Cash" : ""; };
+  function fillAcctOptions(sel, placeholder, filter) {
+    sel.textContent = "";
+    const add = (v, t) => { const o = el("option", null, t); o.value = v; sel.append(o); };
+    if (filter) add("all", "All bank accounts"); else add("", placeholder);
+    for (const a of ACCOUNTS) add(a.id, a.name);
+    add("cash", "Cash (not in a bank account)");
+    if (filter) add("none", "No account chosen");
+  }
+  fillAcctOptions($("#fAcct"), "Choose a bank account");
+  fillAcctOptions($("#invAcct"), "Not decided yet");
+  fillAcctOptions($("#fltAcct"), null, true);
 
   const DEFAULTS = {
     churchName: "Assemblies of God", currency: "$", address: "", payInfo: "",
@@ -379,7 +410,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     report: null, tab: "overview", editing: null, canWrite: true, generating: false, liveText: "" };
   let db = null, sample = null, downloads = null;
   let unsubTx = null, unsubRep = null, loadTimer = null, ctl = null, yearCache = {}, toastTimer = null, monthCache = {}, bankSeq = 0;
-  S.bank = null; S.bankCalc = null;
+  S.banks = {}; S.bankCalc = null; S.selAcct = null; S.bankFormAcct = null;
 
   /* ---------- helpers ---------- */
   const cents = (n) => Math.round(Number(n || 0) * 100);
@@ -434,29 +465,74 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   }
 
   async function computeBank() {
-    const b = S.bank, seq = ++bankSeq;
-    if (!b || !db) { S.bankCalc = null; renderBank(); return; }
-    const start = b.date.slice(0, 7); let end = todayStr().slice(0, 7); if (S.month > end) end = S.month;
+    const seq = ++bankSeq, set = ACCOUNTS.filter((a) => S.banks[a.id] && S.banks[a.id].date);
+    if (!db || !set.length) { S.bankCalc = {}; renderBank(); return; }
+    const start = set.map((a) => S.banks[a.id].date).sort()[0].slice(0, 7); let end = todayStr().slice(0, 7); if (S.month > end) end = S.month;
     const months = []; for (let m = start; m <= end && months.length < 120; m = shiftMonth(m, 1)) months.push(m);
     try {
       const lists = await Promise.all(months.map(async (m) => { if (!monthCache[m]) monthCache[m] = docsToTx(await txCol(m).limit(1000).get()); return monthCache[m]; }));
       if (seq !== bankSeq) return;
-      const t = totals([].concat(...lists).filter((x) => (x.date || "") >= b.date && (b.scope !== "bank" || x.method === "Bank")));
-      S.bankCalc = { inc: t.inc, exp: t.exp, now: cents(b.amount) + t.inc - t.exp };
+      const all = [].concat(...lists), calc = {};
+      for (const a of set) {
+        const b = S.banks[a.id], t = totals(all.filter((x) => x.account === a.id && (x.date || "") >= b.date));
+        calc[a.id] = { inc: t.inc, exp: t.exp, now: cents(b.amount) + t.inc - t.exp };
+      }
+      S.bankCalc = calc;
     } catch (e) { if (seq !== bankSeq) return; S.bankCalc = { error: true }; }
     renderBank();
   }
   function renderBank() {
-    const v = $("#bankView"), b = S.bank, c = S.bankCalc;
-    v.textContent = "";
-    $("#bankEdit").hidden = !S.canWrite || !db; $("#bankEdit").textContent = b ? "Update bank balance" : "Enter bank balance";
-    if (!b) { v.append(el("p", "muted", "No bank balance entered yet. Enter the figure from your bank statement and the app will add income to it and deduct expenses from it as you record them.")); return; }
-    const cell = (lab, val, cls) => { const d = el("div"); d.style.minWidth = "0"; d.append(el("div", "lab", lab), el("div", "bval num " + (cls || ""), val)); return d; };
-    v.append(cell("Entered, as at " + dayLabel(b.date), money(cents(b.amount))));
-    if (!c) { v.append(cell("In the bank now", "Adding up…")); return; }
-    if (c.error) { v.append(el("p", "muted", "The balance could not be worked out just now. It will retry when entries change.")); return; }
-    v.append(cell("Income added since", "+" + money(c.inc), "inc"), cell("Expenses deducted since", "-" + money(c.exp), "exp"), cell("In the bank now", money(c.now), "big" + (c.now < 0 ? " exp" : "")));
-    v.append(el("p", "hint", (b.scope === "bank" ? "Counts only entries marked Paid by: Bank" : "Counts all income and expenses") + " dated on or after " + dayLabel(b.date) + ". When the bank statement shows a different figure, update the balance to match it."));
+    const grid = $("#acctGrid"), c = S.bankCalc;
+    grid.textContent = "";
+    let total = 0, entered = 0, pending = false;
+    for (const a of ACCOUNTS) {
+      const b = S.banks[a.id], r = c && c[a.id];
+      let val;
+      if (!b) val = "Not entered yet";
+      else if (!c) { val = "Adding up…"; pending = true; }
+      else if (c.error || !r) val = "Unavailable";
+      else { val = money(r.now); total += r.now; entered++; }
+      const card = el("button", "acct"); card.type = "button"; card.setAttribute("aria-pressed", String(S.selAcct === a.id));
+      card.append(el("span", "lab", a.name), el("span", "bval num" + (r && r.now < 0 ? " exp" : b ? "" : " muted"), val));
+      card.onclick = () => { S.selAcct = S.selAcct === a.id ? null : a.id; $("#bankForm").hidden = true; renderBank(); };
+      grid.append(card);
+    }
+    const tot = $("#bankTotal");
+    tot.textContent = entered ? money(total) : pending ? "Adding up…" : "–";
+    tot.className = "bval big num" + (total < 0 ? " exp" : "");
+    renderAcctDetail(entered);
+  }
+  function renderAcctDetail(entered) {
+    const d = $("#acctDetail"), a = ACCOUNTS.find((x) => x.id === S.selAcct);
+    d.textContent = "";
+    if (!a) {
+      d.append(el("p", "hint", "Select an account to see its balance and enter the figure from its bank statement. " +
+        (entered < ACCOUNTS.length ? "The total includes " + entered + " of " + ACCOUNTS.length + " accounts; the others have no balance entered yet." : "The total adds up all " + ACCOUNTS.length + " accounts.")));
+      return;
+    }
+    const b = S.banks[a.id], r = S.bankCalc && S.bankCalc[a.id];
+    const head = el("div", "bankhead"), bx = el("div", "actions");
+    head.append(el("h3", null, a.name));
+    if (S.canWrite && db) { const u = el("button", "btn small primary", b ? "Update balance" : "Enter balance"); u.type = "button"; u.onclick = () => openBankForm(a); bx.append(u); }
+    const s = el("button", "btn small", "Show its entries"); s.type = "button";
+    s.onclick = () => { $("#fltAcct").value = a.id; setTab("entries"); renderList(); };
+    bx.append(s); head.append(bx); d.append(head);
+    if (!b) { d.append(el("p", "muted", "No balance entered for this account yet. Enter the figure from its bank statement and the app will add income to it and deduct expenses from it as you record them.")); return; }
+    const cell = (lab, val, cls) => { const x = el("div"); x.style.minWidth = "0"; x.append(el("div", "lab", lab), el("div", "bval num " + (cls || ""), val)); return x; };
+    const row = el("div", "bankrow");
+    row.append(cell("Entered, as at " + dayLabel(b.date), money(cents(b.amount))));
+    if (!S.bankCalc) row.append(cell("In the account now", "Adding up…"));
+    else if (S.bankCalc.error || !r) row.append(el("p", "muted", "The balance could not be worked out just now. It will retry when entries change."));
+    else row.append(cell("Income added since", "+" + money(r.inc), "inc"), cell("Expenses deducted since", "-" + money(r.exp), "exp"), cell("In the account now", money(r.now), "big" + (r.now < 0 ? " exp" : "")));
+    row.append(el("p", "hint", "Counts income and expenses recorded against " + a.name + " dated on or after " + dayLabel(b.date) + ". When the bank statement shows a different figure, update the balance to match it."));
+    d.append(row);
+  }
+  function openBankForm(a) {
+    const b = S.banks[a.id];
+    S.bankFormAcct = a.id;
+    $("#bankFormTitle").textContent = (b ? "Update balance: " : "Enter balance: ") + a.name;
+    $("#bAmount").value = b ? plain(cents(b.amount)) : ""; $("#bDate").value = todayStr();
+    $("#bankForm").hidden = false; $("#bAmount").focus();
   }
 
   function renderOverview() {
@@ -474,17 +550,19 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   }
 
   function renderList() {
-    const body = $("#txBody"), type = $("#fltType").value, q = $("#fltQ").value.trim().toLowerCase();
+    const body = $("#txBody"), type = $("#fltType").value, q = $("#fltQ").value.trim().toLowerCase(), acct = $("#fltAcct").value;
     $("#listTitle").textContent = "Entries for " + monthLabel(S.month);
     body.textContent = "";
     const list = S.tx.filter((x) => (type === "all" || x.type === type) &&
-      (!q || [x.category, x.description, x.party, x.ref, x.method].join(" ").toLowerCase().includes(q)))
+      (acct === "all" || (acct === "none" ? !x.account : x.account === acct)) &&
+      (!q || [x.category, x.description, x.party, x.ref, x.method, acctName(x.account)].join(" ").toLowerCase().includes(q)))
       .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
     for (const x of list) {
       const tr = el("tr");
       tr.append(el("td", "nw num", dayLabel(x.date)));
       const tdT = el("td"); tdT.append(el("span", "pill " + (x.type === "income" ? "inc" : "exp"), x.type === "income" ? "Income" : "Expense")); tr.append(tdT);
       const tdD = el("td"); tdD.append(el("div", null, x.category || "Uncategorised"));
+      if (x.account) tdD.append(el("div", "muted", (x.type === "income" ? "Into " : "From ") + acctName(x.account)));
       const sub = [x.description, x.party ? (x.type === "income" ? "from " : "to ") + x.party : "", x.ref ? "ref " + x.ref : ""].filter(Boolean).join(" · ");
       if (sub) tdD.append(el("div", "muted", sub)); tr.append(tdD);
       tr.append(el("td", "nw", x.method || ""));
@@ -582,6 +660,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     if (want && [...sel.options].some((op) => op.value === want)) sel.value = want;
     $("#catLabel").textContent = type === "income" ? "Income type" : "Expense type";
     $("#partyLabel").textContent = type === "income" ? "Received from" : "Paid to";
+    $("#acctLabel").textContent = type === "income" ? "Paid into bank account" : "Paid from bank account";
     $("#newCatField").hidden = sel.value !== NEW;
   }
 
@@ -689,7 +768,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     (x.type === "expense" ? $("#typeExpense") : $("#typeIncome")).checked = true;
     fillCats(x.category || "");
     $("#fDate").value = x.date; $("#fAmount").value = plain(cents(x.amount)); $("#fDesc").value = x.description || ""; $("#fParty").value = x.party || ""; $("#fRef").value = x.ref || "";
-    $("#fMethod").value = x.method || "Cash";
+    $("#fMethod").value = x.method || "Cash"; $("#fAcct").value = x.account || "";
     $("#formTitle").textContent = "Edit entry"; $("#saveBtn").textContent = "Save changes"; $("#cancelEdit").hidden = false; $("#formMsg").textContent = "";
     dateHint(); setTab("entries"); $("#txForm").scrollIntoView({ block: "nearest" }); $("#fAmount").focus();
   }
@@ -701,13 +780,15 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     let category = $("#fCat").value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { $("#formMsg").textContent = "Choose the date of this entry."; return; }
     if (!(amount > 0)) { $("#formMsg").textContent = "Enter an amount greater than zero."; return; }
+    const account = $("#fAcct").value;
+    if (!account) { $("#formMsg").textContent = type === "expense" ? "Choose which bank account this expense is paid from." : "Choose which bank account this income goes into."; $("#fAcct").focus(); return; }
     if (category === NEW) {
       category = $("#fNewCat").value.trim().replace(/\s+/g, " ");
       if (!category) { $("#formMsg").textContent = "Type a name for the new type."; $("#fNewCat").focus(); return; }
       const existing = S.settings[type].find((n) => n.toLowerCase() === category.toLowerCase());
       if (existing) category = existing;
     }
-    const doc = { type, date, category, amount: amount / 100, description: $("#fDesc").value.trim(), party: $("#fParty").value.trim(), method: $("#fMethod").value, ref: $("#fRef").value.trim(),
+    const doc = { type, date, category, account, amount: amount / 100, description: $("#fDesc").value.trim(), party: $("#fParty").value.trim(), method: $("#fMethod").value, ref: $("#fRef").value.trim(),
       createdAt: (S.editing && S.editing.createdAt) || new Date().toISOString(), updatedAt: new Date().toISOString() };
     const month = date.slice(0, 7), btn = $("#saveBtn"), editing = S.editing;
     btn.disabled = true; $("#formMsg").textContent = "Saving…";
@@ -739,7 +820,14 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
       "TOTALS FOR THE MONTH (already added up correctly; use these exact figures)\n" +
       "Total income: " + plain(t.inc) + " from " + t.nInc + " entries\nTotal expenses: " + plain(t.exp) + " from " + t.nExp + " entries\nSurplus (negative means deficit): " + plain(t.inc - t.exp) + "\n\n" +
       "INCOME BY TYPE\n" + cat(t.byInc) + "\n\nEXPENSES BY TYPE\n" + cat(t.byExp) + "\n\n";
-    if (S.bank && S.bankCalc && !S.bankCalc.error) p += "BANK ACCOUNT\nBalance entered by the treasurer as at " + S.bank.date + ": " + plain(cents(S.bank.amount)) + "\nBalance today after entries recorded since then: " + plain(S.bankCalc.now) + "\nMention the bank balance in the Summary.\n\n";
+    if (S.bankCalc && !S.bankCalc.error) {
+      const have = ACCOUNTS.filter((a) => S.bankCalc[a.id]);
+      if (have.length) p += "BANK ACCOUNTS (balance today: the figure the treasurer entered plus entries recorded since)\n" + have.map((a) => "- " + a.name + ": " + plain(S.bankCalc[a.id].now)).join("\n") +
+        "\nTotal across these accounts: " + plain(have.reduce((s, a) => s + S.bankCalc[a.id].now, 0)) + "\nMention each bank balance and the total in the Summary.\n\n";
+    }
+    const byAcct = new Map();
+    for (const x of S.tx) { const k = acctName(x.account) || "No account chosen"; const v = byAcct.get(k) || [0, 0]; v[x.type === "income" ? 0 : 1] += cents(x.amount); byAcct.set(k, v); }
+    p += "THIS MONTH BY BANK ACCOUNT (income / expenses)\n" + ([...byAcct].map(([k, v]) => "- " + k + ": " + plain(v[0]) + " / " + plain(v[1])).join("\n") || "- none") + "\n\n";
     if (prev && (prev.nInc + prev.nExp) > 0) p += "PREVIOUS MONTH (" + monthLabel(shiftMonth(S.month, -1)) + ") FOR COMPARISON\nTotal income: " + plain(prev.inc) + "\nTotal expenses: " + plain(prev.exp) + "\nIncome by type:\n" + cat(prev.byInc) + "\nExpenses by type:\n" + cat(prev.byExp) + "\n\n";
     else p += "PREVIOUS MONTH: no entries recorded, so make no month-on-month comparison.\n\n";
     p += "ENTRIES (date | kind | type | amount | paid by | description | name)" + (S.tx.length > 500 ? " — first 500 of " + S.tx.length : "") + "\n" + lines + "\n\n" +
@@ -817,7 +905,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     invEditing = inv;
     $("#invNo").value = inv.number || ""; $("#invDate").value = inv.date || todayStr(); $("#invDue").value = inv.due || ""; $("#invTo").value = inv.to || ""; $("#invToInfo").value = inv.toInfo || ""; $("#invNotes").value = inv.notes || "";
     $("#invItems").textContent = ""; (inv.items && inv.items.length ? inv.items : [null]).forEach((it) => addItemRow(it));
-    fillInvCats(inv.category);
+    fillInvCats(inv.category); $("#invAcct").value = inv.account || "";
     $("#invFormTitle").textContent = "Edit invoice " + (inv.number || ""); $("#invSave").textContent = "Save changes"; $("#invCancel").hidden = false; $("#invMsg").textContent = ""; formTotal();
     $("#invForm").scrollIntoView({ block: "nearest" });
   }
@@ -835,7 +923,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     if (!items.length || invTotal({ items }) <= 0) { msg.textContent = "Add at least one item with a price."; return; }
     if (invoices.some((i) => i.number === number && (!invEditing || i.id !== invEditing.id))) { msg.textContent = "Invoice number " + number + " is already used. Choose another."; return; }
     const now = new Date().toISOString(), e = invEditing;
-    const doc = { number, date, due: $("#invDue").value || "", to, toInfo: $("#invToInfo").value.trim(), items, notes: $("#invNotes").value.trim(), category: $("#invCat").value || "",
+    const doc = { number, date, due: $("#invDue").value || "", to, toInfo: $("#invToInfo").value.trim(), items, notes: $("#invNotes").value.trim(), category: $("#invCat").value || "", account: $("#invAcct").value || "",
       status: (e && e.status) || "unpaid", paidDate: (e && e.paidDate) || "", total: invTotal({ items }) / 100, createdAt: (e && e.createdAt) || now, updatedAt: now };
     $("#invSave").disabled = true; msg.textContent = "Saving…";
     try {
@@ -848,10 +936,10 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
     const date = todayStr(), now = new Date().toISOString(), cat = inv.category || S.settings.income[0] || "Other Income";
     const rest = Object.assign({}, inv); delete rest.id;
     try {
-      await txCol(date.slice(0, 7)).add({ type: "income", date, category: cat, amount: invTotal(inv) / 100, description: "Invoice " + (inv.number || ""), party: inv.to || "", method: "Other", ref: inv.number || "", createdAt: now, updatedAt: now });
+      await txCol(date.slice(0, 7)).add({ type: "income", date, category: cat, amount: invTotal(inv) / 100, description: "Invoice " + (inv.number || ""), party: inv.to || "", method: "Other", account: inv.account || "", ref: inv.number || "", createdAt: now, updatedAt: now });
       await db.doc("invoices/" + inv.id).set(Object.assign(rest, { status: "paid", paidDate: date, updatedAt: now }));
       yearCache = {}; monthCache = {}; computeBank();
-      toast("Invoice " + inv.number + " marked paid and recorded as income under " + cat + ".");
+      toast("Invoice " + inv.number + " marked paid and recorded as income under " + cat + (inv.account ? ", into " + acctName(inv.account) : "") + ".");
     } catch (e) { toast("Could not mark the invoice as paid. Try again."); }
   }
   function buildPdf(inv) {
@@ -949,25 +1037,22 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   $("#fDate").addEventListener("change", dateHint);
   $("#txForm").addEventListener("submit", submitTx);
   $("#cancelEdit").onclick = () => resetForm();
-  $("#fltType").onchange = renderList; $("#fltQ").oninput = renderList;
+  $("#fltType").onchange = renderList; $("#fltQ").oninput = renderList; $("#fltAcct").onchange = renderList;
   $("#addIncBtn").onclick = () => addCategory("income", $("#addInc")); $("#addExpBtn").onclick = () => addCategory("expense", $("#addExp"));
   $("#addInc").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory("income", $("#addInc")); } };
   $("#addExp").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory("expense", $("#addExp")); } };
   $("#saveDetails").onclick = () => saveSettings({ churchName: $("#setName").value.trim() || DEFAULTS.churchName, currency: $("#setCur").value.trim() || DEFAULTS.currency, address: $("#setAddr").value.trim(), payInfo: $("#setPay").value.trim() }, "Details saved.");
-  $("#bankEdit").onclick = () => {
-    const b = S.bank;
-    $("#bAmount").value = b ? plain(cents(b.amount)) : ""; $("#bDate").value = todayStr(); $("#bScope").value = (b && b.scope) || "all";
-    $("#bankForm").hidden = false; $("#bAmount").focus();
-  };
   $("#bankCancel").onclick = () => { $("#bankForm").hidden = true; };
   $("#bankForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const amount = Number($("#bAmount").value), date = $("#bDate").value;
-    if (!db || !isFinite(amount) || $("#bAmount").value === "" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast("Enter the balance and its date."); return; }
+    const id = S.bankFormAcct;
+    if (!db || !id || !isFinite(amount) || $("#bAmount").value === "" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast("Enter the balance and its date."); return; }
     $("#bankSave").disabled = true;
     try {
-      await db.doc("settings/bank").set({ amount: cents(amount) / 100, date, scope: $("#bScope").value, updatedAt: new Date().toISOString() });
-      $("#bankForm").hidden = true; toast("Bank balance saved.");
+      const next = Object.assign({}, S.banks, { [id]: { amount: cents(amount) / 100, date, updatedAt: new Date().toISOString() } });
+      await db.doc("settings/banks").set({ accounts: next });
+      $("#bankForm").hidden = true; toast(acctName(id) + " balance saved.");
     } catch (e) { toast("Could not save the bank balance. Try again."); }
     $("#bankSave").disabled = false;
   });
@@ -976,8 +1061,8 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
   $("#copyBtn").onclick = async () => { try { await navigator.clipboard.writeText(reportText()); toast("Report copied."); } catch (e) { const r = document.createRange(); r.selectNodeContents($("#repOut")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Report selected. Press Ctrl+C to copy."); } };
   $("#dlBtn").onclick = () => saveFile("financial-report-" + S.month + ".txt", reportText());
   $("#csvBtn").onclick = () => {
-    const rows = [["Date", "Kind", "Type", "Amount", "Paid by", "Description", "Name", "Reference"]].concat(S.tx.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))
-      .map((x) => [x.date, x.type, x.category, plain(cents(x.amount)), x.method, x.description, x.party, x.ref]));
+    const rows = [["Date", "Kind", "Type", "Bank account", "Amount", "Paid by", "Description", "Name", "Reference"]].concat(S.tx.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+      .map((x) => [x.date, x.type, x.category, acctName(x.account), plain(cents(x.amount)), x.method, x.description, x.party, x.ref]));
     saveFile("church-accounts-" + S.month + ".csv", rows.map((r) => r.map(csvCell).join(",")).join("\r\n"));
   };
 
@@ -993,7 +1078,7 @@ tr.head td { font: 700 13px var(--display); letter-spacing: .08em; text-transfor
       if (snap.exists) { const s = snap.data(); S.settings = { churchName: s.churchName || DEFAULTS.churchName, currency: s.currency || DEFAULTS.currency, address: s.address || "", payInfo: s.payInfo || "", income: Array.isArray(s.income) ? s.income.slice() : DEFAULTS.income.slice(), expense: Array.isArray(s.expense) ? s.expense.slice() : DEFAULTS.expense.slice() }; }
       fillCats(); render(); if (S.tab === "year") renderYear();
     }, () => {});
-    db.doc("settings/bank").onSnapshot((snap) => { S.bank = snap.exists ? snap.data() : null; S.bankCalc = null; renderBank(); computeBank(); }, () => {});
+    db.doc("settings/banks").onSnapshot((snap) => { const d = snap.exists ? snap.data() : null; S.banks = (d && d.accounts) || {}; S.bankCalc = null; renderBank(); computeBank(); }, () => {});
     db.collection("invoices").limit(1000).onSnapshot((snap) => { invoices = docsToTx(snap); invLoaded = true; if (!invEditing && !$("#invTo").value) $("#invNo").value = nextInvNo(); renderInvoices(); }, () => { invLoaded = true; renderInvoices(); });
     subscribeMonth();
     if (S.tab === "year") loadYear();

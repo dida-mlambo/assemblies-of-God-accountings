@@ -7,7 +7,7 @@ An income and expenditure ledger for an Assemblies of God church. It runs entire
 - Records income and expenses, each with a date, type, amount, description, name, payment method and receipt number.
 - Backdating: choose any past date and the entry is filed under that month.
 - Income and expense types can be added and removed (Tithes, Offerings, Building Fund and so on).
-- Bank balance: type the balance from the bank statement and its date. Income recorded from that date is added and expenses are deducted.
+- Four bank accounts (Projects, Bible School, National General Fund, Festival of Hope): enter each account's balance from its statement, choose the account on every income and expense, and see each balance plus the total across all accounts.
 - Monthly income and expenditure statement, a year view, and CSV export.
 - Invoices: create numbered invoices with line items, download them as PDF, print or share them, and mark them paid (which records the income).
 - AI-written monthly report with a summary, observations and recommendations.
