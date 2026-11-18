@@ -241,6 +241,8 @@ details.saved .report { margin-top: 8px }
       <p class="hint" id="dateHint">Pick any past date to backdate. The entry is filed under the month of its date.</p>
       <label class="field"><span id="catLabel">Income type</span><select id="fCat" required></select></label>
       <label class="field" id="newCatField" hidden><span>Name of the new type</span><input type="text" id="fNewCat" maxlength="60" placeholder="e.g. Youth Conference Offering"></label>
+      <label class="field" id="projRow" hidden><span>Which project is it for?</span><select id="fProj"></select></label>
+      <label class="field" id="newProjField" hidden><span>Name of the new project</span><input type="text" id="fNewProj" maxlength="80" placeholder="e.g. New church roof"></label>
       <label class="field"><span id="acctLabel">Paid into bank account</span><select id="fAcct"></select></label>
       <label class="field"><span>Amount</span><input type="number" id="fAmount" min="0.01" step="0.01" inputmode="decimal" required placeholder="0.00"></label>
       <label class="field"><span>Description</span><input type="text" id="fDesc" maxlength="200" placeholder="e.g. Sunday first service"></label>
@@ -248,6 +250,7 @@ details.saved .report { margin-top: 8px }
         <label class="field"><span>Province</span><select id="fProv"></select></label>
         <label class="field"><span>Church / assembly</span><input type="text" id="fChurch" maxlength="100" list="churchList" placeholder="Name of the church"></label>
       </div>
+      <label class="field" id="newProvField" hidden><span>Name of the new province</span><input type="text" id="fNewProv" maxlength="60" placeholder="Province name as the church uses it"></label>
       <datalist id="churchList"></datalist>
       <div class="row2">
         <label class="field"><span id="partyLabel">Received from</span><input type="text" id="fParty" maxlength="100"></label>
@@ -419,9 +422,9 @@ details.saved .report { margin-top: 8px }
   <!-- YEAR -->
   <section id="tab-year" hidden>
     <div class="panel">
-      <h2 id="yearTitle">Year</h2>
+      <div class="bankhead"><h2 id="yearTitle">Year</h2><div class="actions"><button class="btn small primary" id="yearPdf" type="button">Download year PDF</button><button class="btn small" id="yearPrint" type="button">Print year</button></div></div>
       <div class="scroll"><table>
-        <thead><tr><th>Month</th><th class="r">Income</th><th class="r">Expenses</th><th class="r">Surplus / deficit</th><th class="r">Running total</th></tr></thead>
+        <thead><tr><th>Month</th><th class="r">Income</th><th class="r">Expenses</th><th class="r">Surplus / deficit</th><th class="r">Running total</th><th class="r">PDF report</th></tr></thead>
         <tbody id="yearBody"></tbody>
       </table></div>
       <div class="empty" id="yearEmpty" hidden></div>
@@ -443,9 +446,15 @@ details.saved .report { margin-top: 8px }
     </div>
     <div class="panel">
       <h2>Provinces</h2>
-      <p class="hint">The provinces that send income. Choose one on each income entry to see giving and participation by province.</p>
+      <p class="hint">The provinces that send income, named the way the church names them. Add as many as you need here, or with "+ Add a new province…" on the entry form. Removing one keeps it on entries already recorded.</p>
       <div class="chips" id="chipsProv"></div>
       <div class="addrow field"><input type="text" id="addProv" maxlength="60" placeholder="New province" aria-label="New province"><button class="btn" id="addProvBtn" type="button">Add</button></div>
+    </div>
+    <div class="panel">
+      <h2>Projects</h2>
+      <p class="hint">Projects that Project Funds can be dedicated to. Choose one on the entry form when the income type is Project Funds.</p>
+      <div class="chips" id="chipsProj"></div>
+      <div class="addrow field"><input type="text" id="addProj" maxlength="80" placeholder="New project" aria-label="New project"><button class="btn" id="addProjBtn" type="button">Add</button></div>
     </div>
     <div class="panel">
       <h2>Church details</h2>
@@ -493,7 +502,7 @@ details.saved .report { margin-top: 8px }
 
   const DEFAULTS = {
     churchName: "Assemblies of God", currency: "$", address: "", payInfo: "", provinces: [],
-    income: ["Tithes", "Offerings", "Thanksgiving", "Building Fund", "Missions", "Sunday School", "Special Seed", "Donations", "Other Income"],
+    income: ["GP Member Tithe", "Provincial 60%", "MFF Contribution", "Project Funds"], incomeSet: 2, projects: [],
     expense: ["Pastoral Support", "Rent", "Utilities", "Missions & Outreach", "Maintenance", "Equipment", "Welfare", "Transport", "District / HQ Remittance", "Administration", "Other Expense"],
   };
 
@@ -657,6 +666,7 @@ details.saved .report { margin-top: 8px }
       const tdD = el("td"); tdD.append(el("div", null, x.category || "Uncategorised"));
       if (x.account) tdD.append(el("div", "muted", (x.type === "income" ? "Into " : "From ") + acctName(x.account)));
       if (x.church || x.province) tdD.append(el("div", "muted", [x.church, x.province].filter(Boolean).join(", ")));
+      if (x.project) tdD.append(el("div", "muted", "Project: " + x.project));
       const sub = [x.description, x.party ? (x.type === "income" ? "from " : "to ") + x.party : "", x.ref ? "ref " + x.ref : ""].filter(Boolean).join(" · ");
       if (sub) tdD.append(el("div", "muted", sub)); tr.append(tdD);
       tr.append(el("td", "nw", x.method || ""));
@@ -703,7 +713,7 @@ details.saved .report { margin-top: 8px }
     }
   }
   function renderSettings() {
-    renderChips($("#chipsInc"), "income"); renderChips($("#chipsExp"), "expense"); renderChips($("#chipsProv"), "provinces");
+    renderChips($("#chipsInc"), "income"); renderChips($("#chipsExp"), "expense"); renderChips($("#chipsProv"), "provinces"); renderChips($("#chipsProj"), "projects");
     if (document.activeElement !== $("#setName")) $("#setName").value = S.settings.churchName;
     if (document.activeElement !== $("#setCur")) $("#setCur").value = S.settings.currency;
     if (document.activeElement !== $("#setAddr")) $("#setAddr").value = S.settings.address || "";
@@ -722,13 +732,14 @@ details.saved .report { margin-top: 8px }
     $("#catLabel").textContent = type === "income" ? "Income type" : "Expense type";
     $("#partyLabel").textContent = type === "income" ? "Received from" : "Paid to";
     $("#acctLabel").textContent = type === "income" ? "Paid into bank account" : "Paid from bank account";
-    $("#provRow").hidden = type !== "income"; fillProv();
+    $("#provRow").hidden = type !== "income"; fillProv(); fillProj(); updateEntryExtras();
     $("#newCatField").hidden = sel.value !== NEW;
   }
 
   function renderYear() {
     const y = S.month.slice(0, 4), body = $("#yearBody"), empty = $("#yearEmpty");
     $("#yearTitle").textContent = "Year " + y + ", month by month";
+    $("#yearPdf").hidden = !downloads; $("#yearPrint").hidden = !standalone;
     body.textContent = "";
     const data = yearCache[y];
     if (!data) { empty.hidden = false; empty.textContent = db ? "Adding up " + y + "…" : "The ledger can't be reached in this view."; return; }
@@ -739,10 +750,12 @@ details.saved .report { margin-top: 8px }
       const tr = el("tr"), td = el("td"), b = el("button", "btn small", monthLabel(m)); b.type = "button";
       b.onclick = () => { setMonth(m); setTab("overview"); }; td.append(b);
       tr.append(td, el("td", "r num", money(t.inc)), el("td", "r num", money(t.exp)), el("td", "r num " + (net < 0 ? "exp" : ""), money(net)), el("td", "r num " + (run < 0 ? "exp" : ""), money(run)));
+      const pd = el("td", "r"), pb = el("button", "btn small", "PDF"); pb.type = "button"; pb.setAttribute("aria-label", "Download PDF report for " + monthLabel(m));
+      pb.onclick = () => quickPdf("month", m + "-01", "pdf"); pb.hidden = !downloads; pd.append(pb); tr.append(pd);
       body.append(tr);
     });
     const tr = el("tr", "total");
-    tr.append(el("td", null, "Total " + y), el("td", "r num", money(ti)), el("td", "r num", money(te)), el("td", "r num", money(ti - te)), el("td", "r num", ""));
+    tr.append(el("td", null, "Total " + y), el("td", "r num", money(ti)), el("td", "r num", money(te)), el("td", "r num", money(ti - te)), el("td", "r num", ""), el("td"));
     body.append(tr);
   }
   async function loadYear() {
@@ -759,7 +772,7 @@ details.saved .report { margin-top: 8px }
   function render() {
     renderHeader(); renderBank(); renderOverview(); renderList(); renderReport(); renderProvinces(); renderSettings(); renderInvoices();
     $("#quickAdd").hidden = !S.canWrite; $("#txForm").hidden = !S.canWrite;
-    for (const id of ["addInc", "addIncBtn", "addExp", "addExpBtn", "addProv", "addProvBtn", "saveDetails"]) $("#" + id).disabled = !S.canWrite;
+    for (const id of ["addInc", "addIncBtn", "addExp", "addExpBtn", "addProv", "addProvBtn", "addProj", "addProjBtn", "saveDetails"]) $("#" + id).disabled = !S.canWrite;
   }
 
   /* ---------- navigation ---------- */
@@ -798,11 +811,33 @@ details.saved .report { margin-top: 8px }
     }, (e) => { clearTimeout(loadTimer); S.loaded = true; banner("The ledger stopped responding (" + e.code + "). Reload the page to reconnect."); render(); });
   }
 
+  function settingsDoc(n) {
+    return { churchName: n.churchName, currency: n.currency, address: n.address || "", payInfo: n.payInfo || "", provinces: n.provinces || [], projects: n.projects || [],
+      incomeSet: n.incomeSet || DEFAULTS.incomeSet, income: n.income, expense: n.expense };
+  }
+  const isProjectCat = (c) => /project/i.test(c || "");
+  function projectMap(list) { const m = new Map(); for (const x of list) if (x.type === "income" && isProjectCat(x.category)) { const k = x.project || "General project funds"; m.set(k, (m.get(k) || 0) + cents(x.amount)); } return m; }
+  function fillProj(keep) {
+    const sel = $("#fProj"), want = keep != null ? keep : sel.value, names = (S.settings.projects || []).slice();
+    sel.textContent = "";
+    const add = (v, t) => { const o = el("option", null, t); o.value = v; sel.append(o); };
+    add("", "General project funds (no specific project)");
+    if (want && want !== NEW && !names.includes(want)) names.push(want);
+    names.forEach((n) => add(n, n));
+    add(NEW, "+ Add a new project…");
+    sel.value = want || "";
+  }
+  function updateEntryExtras() {
+    const income = !$("#typeExpense").checked;
+    $("#projRow").hidden = !(income && isProjectCat($("#fCat").value));
+    $("#newProjField").hidden = $("#projRow").hidden || $("#fProj").value !== NEW;
+    $("#newProvField").hidden = !income || $("#fProv").value !== NEW;
+  }
   async function saveSettings(patch, msg) {
     if (!db) return;
     const next = Object.assign({}, S.settings, patch);
     S.settings = next; fillCats(); render();
-    try { await db.doc("settings/main").set({ churchName: next.churchName, currency: next.currency, address: next.address || "", payInfo: next.payInfo || "", provinces: next.provinces || [], income: next.income, expense: next.expense }); if (msg) toast(msg); }
+    try { await db.doc("settings/main").set(settingsDoc(next)); if (msg) toast(msg); }
     catch (e) { toast("Could not save that change. Try again."); }
   }
   function addCategory(kind, input) {
@@ -832,7 +867,7 @@ details.saved .report { margin-top: 8px }
     fillCats(x.category || "");
     $("#fDate").value = x.date; $("#fAmount").value = plain(cents(x.amount)); $("#fDesc").value = x.description || ""; $("#fParty").value = x.party || ""; $("#fRef").value = x.ref || "";
     $("#fMethod").value = x.method || "Cash"; $("#fAcct").value = x.account || "";
-    fillProv(x.province || ""); $("#fChurch").value = x.church || "";
+    fillProv(x.province || ""); $("#fChurch").value = x.church || ""; fillProj(x.project || ""); updateEntryExtras();
     $("#formTitle").textContent = "Edit entry"; $("#saveBtn").textContent = "Save changes"; $("#cancelEdit").hidden = false; $("#formMsg").textContent = "";
     dateHint(); setTab("entries"); $("#txForm").scrollIntoView({ block: "nearest" }); $("#fAmount").focus();
   }
@@ -852,7 +887,16 @@ details.saved .report { margin-top: 8px }
       const existing = S.settings[type].find((n) => n.toLowerCase() === category.toLowerCase());
       if (existing) category = existing;
     }
-    const doc = { type, date, category, account, province: type === "income" ? $("#fProv").value : "", church: type === "income" ? $("#fChurch").value.trim().replace(/\s+/g, " ") : "", amount: amount / 100, description: $("#fDesc").value.trim(), party: $("#fParty").value.trim(), method: $("#fMethod").value, ref: $("#fRef").value.trim(),
+    const newName = (sel, input, list, what) => {
+      let v = sel === NEW ? $(input).value.trim().replace(/\s+/g, " ") : sel;
+      if (sel === NEW && !v) { $("#formMsg").textContent = "Type the name of the new " + what + "."; $(input).focus(); return null; }
+      const ex = (list || []).find((n) => n.toLowerCase() === v.toLowerCase()); return ex || v;
+    };
+    const province = type === "income" ? newName($("#fProv").value, "#fNewProv", S.settings.provinces, "province") : "";
+    if (province === null) return;
+    const project = type === "income" && isProjectCat(category) ? newName($("#fProj").value, "#fNewProj", S.settings.projects, "project") : "";
+    if (project === null) return;
+    const doc = { type, date, category, account, province, project, church: type === "income" ? $("#fChurch").value.trim().replace(/\s+/g, " ") : "", amount: amount / 100, description: $("#fDesc").value.trim(), party: $("#fParty").value.trim(), method: $("#fMethod").value, ref: $("#fRef").value.trim(),
       createdAt: (S.editing && S.editing.createdAt) || new Date().toISOString(), updatedAt: new Date().toISOString() };
     const month = date.slice(0, 7), btn = $("#saveBtn"), editing = S.editing;
     btn.disabled = true; $("#formMsg").textContent = "Saving…";
@@ -860,6 +904,8 @@ details.saved .report { margin-top: 8px }
       if (editing && editing.month === month) await txCol(month).doc(editing.id).set(doc);
       else { await txCol(month).add(doc); if (editing) await txCol(editing.month).doc(editing.id).delete(); }
       if (!S.settings[type].includes(category)) await saveSettings({ [type]: S.settings[type].concat(category) });
+      if (province && !(S.settings.provinces || []).includes(province)) await saveSettings({ provinces: (S.settings.provinces || []).concat(province) });
+      if (project && !(S.settings.projects || []).includes(project)) await saveSettings({ projects: (S.settings.projects || []).concat(project) });
       yearCache = {}; monthCache = {}; computeBank(); markPeriodStale();
       const what = (type === "income" ? "Income" : "Expense") + " of " + money(amount) + (editing ? " updated" : " saved");
       if (month !== S.month) toast(what + " under " + monthLabel(month) + ".", "View " + monthLabel(month), () => setMonth(month)); else toast(what + ".");
@@ -964,6 +1010,8 @@ details.saved .report { margin-top: 8px }
     if (ba.size) { stmtRow(body, "head", "By bank account (in / out)"); for (const [k, v] of ba) stmtRow(body, "", k, money(v[0]) + " / " + money(v[1])); }
     const pr = provRows().filter((x) => x.s.total);
     if (pr.length) { stmtRow(body, "head", "Income by province"); for (const x of pr) stmtRow(body, "", x.name, money(x.s.total)); }
+    const pj = projectMap(P.tx);
+    if (pj.size) { stmtRow(body, "head", "Project funds by project"); for (const [k, v] of sorted(pj)) stmtRow(body, "", k, money(v)); }
     const months = monthsIn(r.start, r.end);
     if (months.length > 1) {
       host.append(el("h3", null, "Month by month"));
@@ -1015,6 +1063,8 @@ details.saved .report { margin-top: 8px }
     p += "THIS PERIOD BY BANK ACCOUNT (income / expenses)\n" + ([...ba].map(([k, v]) => "- " + k + ": " + plain(v[0]) + " / " + plain(v[1])).join("\n") || "- none") + "\n\n";
     const pr = provRows(), hasProv = pr.some((x) => x.s.total);
     if (hasProv) p += "INCOME BY PROVINCE (total / contributions / churches that gave / previous period total)\n" + pr.map((x) => "- " + x.name + ": " + plain(x.s.total) + " / " + x.s.n + " / " + x.s.churches.size + " / " + plain(x.prev)).join("\n") + "\n\n";
+    const pj = projectMap(P.tx);
+    if (pj.size) p += "PROJECT FUNDS BY PROJECT (mention these in the Income section)\n" + sorted(pj).map(([k, v]) => "- " + k + ": " + plain(v)).join("\n") + "\n\n";
     if (months.length > 1) {
       const inc = seriesByMonth(P.tx, months, (x) => x.type === "income"), exp = seriesByMonth(P.tx, months, (x) => x.type !== "income");
       p += "MONTH BY MONTH (income / expenses)\n" + months.map((mm) => "- " + monthLabel(mm) + ": " + plain(inc.get(mm)) + " / " + plain(exp.get(mm))).join("\n") + "\n\n";
@@ -1102,6 +1152,8 @@ details.saved .report { margin-top: 8px }
     if (S.bankCalc && !S.bankCalc.error && have.length) { head("Bank balances today"); have.forEach((a) => row(a.name, money(S.bankCalc[a.id].now))); y += 1; rule(); row("Total in all bank accounts", money(have.reduce((s, a) => s + S.bankCalc[a.id].now, 0)), true); }
     const pr = provRows().filter((x) => x.s.total);
     if (pr.length) { head("Income by province"); pr.forEach((x) => row(x.name + " (" + x.s.churches.size + " churches, " + x.s.n + " contributions)", money(x.s.total))); }
+    const pj = projectMap(P.tx);
+    if (pj.size) { head("Project funds by project"); sorted(pj).forEach(([k, v]) => row(k, money(v))); }
     const months = monthsIn(r.start, r.end);
     if (months.length > 1) {
       head("Month by month"); ensure(6); font("bold", 8.5, MUTED);
@@ -1122,6 +1174,15 @@ details.saved .report { margin-top: 8px }
     const n = doc.getNumberOfPages();
     for (let i = 1; i <= n; i++) { doc.setPage(i); font("normal", 8, MUTED); doc.text("Page " + i + " of " + n, R, 290, RA); doc.text(doc.splitTextToSize(pdfSafe(S.settings.churchName + " - " + r.label), 140)[0], L, 290); }
     return doc;
+  }
+  async function quickPdf(kind, anchor, action) {
+    if (!db) { toast("The ledger can't be reached in this view."); return; }
+    toast("Preparing the PDF…");
+    P.kind = kind; P.anchor = anchor;
+    await loadPeriod();
+    if (!P.loaded || P.error) { toast("The figures could not be loaded. Try again."); return; }
+    await new Promise((r) => setTimeout(r, 700)); // lets a saved AI report for this period arrive so it is included
+    await deliverPdf(action, buildReportPdf(), "report-" + P.range.key + ".pdf", S.settings.churchName + " " + KIND_WORD[P.range.kind] + " report");
   }
   async function deliverPdf(kind, doc, name, title) {
     if (!doc) { toast("The PDF tool did not load. Check the internet connection and reload the page."); return; }
@@ -1246,8 +1307,9 @@ details.saved .report { margin-top: 8px }
     sel.textContent = "";
     const add = (v, t) => { const o = el("option", null, t); o.value = v; sel.append(o); };
     add("", "Not from a province");
-    if (want && !names.includes(want)) names.push(want);
+    if (want && want !== NEW && !names.includes(want)) names.push(want);
     names.forEach((n) => add(n, n));
+    add(NEW, "+ Add a new province…");
     sel.value = want || "";
   }
 
@@ -1528,7 +1590,13 @@ details.saved .report { margin-top: 8px }
   document.querySelectorAll(".tabs button").forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });
   $("#quickAdd").onclick = () => { setTab("entries"); $("#fAmount").focus(); };
   $("#typeIncome").onchange = () => fillCats(""); $("#typeExpense").onchange = () => fillCats("");
-  $("#fCat").onchange = () => { const isNew = $("#fCat").value === NEW; $("#newCatField").hidden = !isNew; if (isNew) $("#fNewCat").focus(); };
+  $("#fCat").onchange = () => { const isNew = $("#fCat").value === NEW; $("#newCatField").hidden = !isNew; updateEntryExtras(); if (isNew) $("#fNewCat").focus(); };
+  $("#fProv").onchange = () => { updateEntryExtras(); if ($("#fProv").value === NEW) $("#fNewProv").focus(); };
+  $("#fProj").onchange = () => { updateEntryExtras(); if ($("#fProj").value === NEW) $("#fNewProj").focus(); };
+  $("#addProjBtn").onclick = () => addCategory("projects", $("#addProj"));
+  $("#addProj").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory("projects", $("#addProj")); } };
+  $("#yearPdf").onclick = () => quickPdf("year", S.month.slice(0, 4) + "-01-01", "pdf");
+  $("#yearPrint").onclick = () => quickPdf("year", S.month.slice(0, 4) + "-01-01", "print");
   $("#fDate").addEventListener("change", dateHint);
   $("#txForm").addEventListener("submit", submitTx);
   $("#cancelEdit").onclick = () => resetForm();
@@ -1570,8 +1638,8 @@ details.saved .report { margin-top: 8px }
   $("#scanAddExp").onclick = () => scanToEntry("expense"); $("#scanAddInc").onclick = () => scanToEntry("income");
   $("#scanSave").onclick = saveScan;
   $("#csvBtn").onclick = () => {
-    const rows = [["Date", "Kind", "Type", "Bank account", "Province", "Church", "Amount", "Paid by", "Description", "Name", "Reference"]].concat(S.tx.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))
-      .map((x) => [x.date, x.type, x.category, acctName(x.account), x.province, x.church, plain(cents(x.amount)), x.method, x.description, x.party, x.ref]));
+    const rows = [["Date", "Kind", "Type", "Project", "Bank account", "Province", "Church", "Amount", "Paid by", "Description", "Name", "Reference"]].concat(S.tx.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+      .map((x) => [x.date, x.type, x.category, x.project, acctName(x.account), x.province, x.church, plain(cents(x.amount)), x.method, x.description, x.party, x.ref]));
     saveFile("church-accounts-" + S.month + ".csv", rows.map((r) => r.map(csvCell).join(",")).join("\r\n"));
   };
 
@@ -1584,7 +1652,14 @@ details.saved .report { margin-top: 8px }
     db = d;
     if (!db) { S.loaded = true; banner("The ledger can't be opened in this view. Open this page in claude.ai while signed in to record and see entries."); render(); return; }
     db.doc("settings/main").onSnapshot((snap) => {
-      if (snap.exists) { const s = snap.data(); S.settings = { churchName: s.churchName || DEFAULTS.churchName, currency: s.currency || DEFAULTS.currency, address: s.address || "", payInfo: s.payInfo || "", provinces: Array.isArray(s.provinces) ? s.provinces.slice() : [], income: Array.isArray(s.income) ? s.income.slice() : DEFAULTS.income.slice(), expense: Array.isArray(s.expense) ? s.expense.slice() : DEFAULTS.expense.slice() }; }
+      if (snap.exists) {
+        const s = snap.data();
+        S.settings = { churchName: s.churchName || DEFAULTS.churchName, currency: s.currency || DEFAULTS.currency, address: s.address || "", payInfo: s.payInfo || "",
+          provinces: Array.isArray(s.provinces) ? s.provinces.slice() : [], projects: Array.isArray(s.projects) ? s.projects.slice() : [], incomeSet: s.incomeSet || 0,
+          income: Array.isArray(s.income) ? s.income.slice() : DEFAULTS.income.slice(), expense: Array.isArray(s.expense) ? s.expense.slice() : DEFAULTS.expense.slice() };
+        // One-time switch to the church's own income types (GP Member Tithe, Provincial 60%, MFF Contribution, Project Funds).
+        if (S.settings.incomeSet !== DEFAULTS.incomeSet) { S.settings.income = DEFAULTS.income.slice(); S.settings.incomeSet = DEFAULTS.incomeSet; db.doc("settings/main").set(settingsDoc(S.settings)).catch(() => {}); }
+      }
       fillCats(); render(); if (S.tab === "year") renderYear();
     }, () => {});
     db.doc("settings/banks").onSnapshot((snap) => { const d = snap.exists ? snap.data() : null; S.banks = (d && d.accounts) || {}; S.bankCalc = null; renderBank(); computeBank(); }, () => {});
@@ -1595,8 +1670,8 @@ details.saved .report { margin-top: 8px }
     if (S.tab === "report" || S.tab === "provinces") loadPeriod();
   });
   use("sample").then((s) => { sample = s; renderReport(); renderProvinces(); renderScan(); });
-  use("downloads").then((d) => { downloads = d; renderList(); renderReport(); renderInvoices(); });
-  use("standalone").then((s) => { standalone = s; renderInvoices(); renderReport(); });
+  use("downloads").then((d) => { downloads = d; renderList(); renderReport(); renderInvoices(); if (S.tab === "year") renderYear(); });
+  use("standalone").then((s) => { standalone = s; renderInvoices(); renderReport(); if (S.tab === "year") renderYear(); });
   use("user").then(async (u) => { if (!u) return; const can = await u.can("data.write"); if (can === false) { S.canWrite = false; render(); } });
 })();
 </script>
