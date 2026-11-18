@@ -69,11 +69,38 @@
 
   /* ---------------- Claude (AI reports) ---------------- */
   function getKey() { try { return localStorage.getItem(API_KEY) || ""; } catch (e) { return ""; } }
+  /* Photos are shrunk to at most 1600px and sent as JPEG; PDFs are sent as documents. */
+  function readB64(blob) { return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(String(fr.result).split(",")[1]); }; fr.onerror = rej; fr.readAsDataURL(blob); }); }
+  function toBlock(blob) {
+    if (blob.type === "application/pdf") return readB64(blob).then(function (d) { return { type: "document", source: { type: "base64", media_type: "application/pdf", data: d } }; });
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(blob), img = new Image();
+      img.onload = function () {
+        var s = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas"), g;
+        c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+        g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: c.toDataURL("image/jpeg", 0.85).split(",")[1] } });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error("unreadable image")); };
+      img.src = url;
+    });
+  }
   function sample(input, opts) {
     opts = opts || {};
     var key = getKey();
     if (!key) { showKeyForm(true); return Promise.reject({ code: "no_key", message: "No API key", userMessage: "Add your Anthropic API key first, in the panel at the bottom of the page." }); }
-    var messages = typeof input === "string" ? [{ role: "user", content: input }] : input;
+    var imgs = !opts.images ? [] : opts.images instanceof Blob ? [opts.images] : Array.prototype.slice.call(opts.images);
+    return Promise.all(imgs.map(toBlock)).then(function (blocks) {
+      var messages = typeof input === "string" ? [{ role: "user", content: input }] : input.slice();
+      if (blocks.length) { var last = messages[messages.length - 1]; messages[messages.length - 1] = { role: "user", content: blocks.concat([{ type: "text", text: last.content }]) }; }
+      return send(messages, opts, key);
+    }, function () { throw { code: "image_rejected", message: "unreadable file", userMessage: "One of the files could not be read. Try a clearer photo in JPG or PNG format, or a PDF." }; });
+  }
+  sample.limits = function () {
+    return Promise.resolve({ maxPromptBytes: 262144, images: { maxCount: 5, maxInputBytes: 30 * 1024 * 1024, mediaTypes: ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"] } });
+  };
+  function send(messages, opts, key) {
     return fetch("https://api.anthropic.com/v1/messages", {
       method: "POST", signal: opts.signal,
       headers: {
@@ -206,7 +233,7 @@
     say("Preparing the backup…");
     var out = {};
     var grab = function (q) { return q.get().then(function (s) { s.forEach(function (d) { out[d.ref.path] = d.data(); }); }); };
-    Promise.all([grab(fbStore.collection("settings")), grab(fbStore.collection("invoices")), grab(fbStore.collection("reports")), grab(fbStore.collectionGroup("tx"))]).then(function () {
+    Promise.all([grab(fbStore.collection("settings")), grab(fbStore.collection("invoices")), grab(fbStore.collection("reports")), grab(fbStore.collectionGroup("tx")), grab(fbStore.collection("scans"))]).then(function () {
       var n = Object.keys(out).length; if (!n) { say("There is nothing to back up yet."); return; }
       var d = new Date(), stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
       saveBlob("church-accounts-backup-" + stamp + ".json", JSON.stringify({ app: "ag-church-accounts", version: 1, exportedAt: d.toISOString(), docs: out }, null, 1));

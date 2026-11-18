@@ -8,7 +8,10 @@ An income and expenditure ledger for an Assemblies of God church. It runs entire
 - Backdating: choose any past date and the entry is filed under that month.
 - Income and expense types can be added and removed (Tithes, Offerings, Building Fund and so on).
 - Four bank accounts (Projects, Bible School, National General Fund, Festival of Hope): enter each account's balance from its statement, choose the account on every income and expense, and see each balance plus the total across all accounts.
-- Monthly income and expenditure statement, a year view, and CSV export.
+- Reports for any week, month, quarter or year, and a General Council report covering 2.5 years: statement, bank accounts, provinces, month-by-month figures, an AI-written report, and a PDF to download, print or share.
+- Provinces: record the province and church on each income entry to see a chart of giving by province, month-by-month activity, participation by church, and an AI summary.
+- Scan documents: photograph a receipt, invoice, bank statement or report and Claude summarizes it, pulls out the figures, and can fill in an entry from it.
+- A year view and CSV export.
 - Invoices: create numbered invoices with line items, download them as PDF, print or share them, and mark them paid (which records the income).
 - AI-written monthly report with a summary, observations and recommendations.
 
